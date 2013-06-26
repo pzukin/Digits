@@ -1,0 +1,5 @@
+This repository contains multiple python programs that use different machine learning algorithms on the kaggle Digit Recognizer competition.
+
+The training and test data sets are also in the repository in case you wanted to try out the code.
+
+digitSVM.py utilizes support vector machine
