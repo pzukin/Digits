@@ -7,6 +7,7 @@ import matplotlib.cm as cm
 from sklearn import svm
 from sklearn import cross_validation
 import csv
+import utils
 
 # SVM takes very long to compute
 # play with different kernels
@@ -16,73 +17,25 @@ import csv
 # behavior of Learning Curve?
 # why does SVD produce different eigenvalues each time?
 
-def ReadDat(path,ch):
+def TrainSVM(X_train, X_val, X_test, y_train, y_val, y_test):
 
-    # using genfromtxt takes too long so I'm doing it differently
+    '''
+    This function finds the optimal parameters for the classifier
+                                                                 
+    Parameters:
+    ----------
+    X_train: numpy array (training set)
+    X_val: numpy array (cross validation set)
+    X_test: numpy array (test set)
+    y_train: numpy array (class labels for training set)
+    y_val: numpy array (class labels for validation set)
+    y_test: numpy array (class lables for test set)
 
-    f = open(path)
-    file = f.read()
-    f.close()
-    
-    # neglecting first labeled row
-    lines = file.splitlines()[1:]
-    
-    # will save data in new data structure
-    # know dimensions beforehand                                                                                           
-    # row labels different samples, column labels different pixels                                                         
-    dat = np.zeros((len(lines),784),dtype = np.float64)
-    tar = np.zeros(len(lines),dtype = np.float64)
+    Returns:
+    --------
+    optim: optimal parameters for the classifier
+    '''
 
-    for i in xrange(0,len(lines)):
-        tmp = np.float64(lines[i].split(","))
-        dat[i,:] = tmp[ch:]
-        tar[i] = tmp[0] # only relevan when ch=1 (training set)
-
-    return dat, tar
-
-def PreProcess(dat):
-
-    # first mean normalization
-    print 'Feature normalization'
-    dat = meanNorm(dat)
-
-    # now SVD (ML training took too long to run on whole data set)
-    print 'SVD'
-    cov = np.cov(dat.T,bias=1) # covariance matrix
-    U, s, V = np.linalg.svd(cov, full_matrices=True)
-
-    # now choose dimension of projection so that we retain 90% of variance
-    for i in xrange(1,len(s)+1):
-        if (np.sum(s[:i])/np.sum(s) > 0.90):
-            break
-
-    print i, 'features. Used to be', np.shape(dat)[1]
-    U_r = U[:,:i] # reduced matrix U that projects onto smaller dimensional space
-    dat = np.dot(dat,U_r)
-
-    return dat, U_r
-
-def meanNorm(dat):
-# mean Normalization
-
-    mu = np.mean(dat, axis=0)
-    sigma = np.std(dat, axis=0)
-    dat = (dat-mu)/sigma
-
-    # some feautures have mu=0.0, sigma=0.0. force all those features to be zero                         
-    dat[np.isnan(dat)]=0.0
-
-    return dat
-
-def TrainSVM(X_train, X_val, X_test, y_train, y_val, y_test, U_r):
-
-    # first perform mean normalization on validation and test set
-    X_val = meanNorm(X_val)
-    X_test = meanNorm(X_test)
-
-    # now project onto smaller dimensional space
-    X_val = np.dot(X_val,U_r)
-    X_test = np.dot(X_test,U_r)
 
     # choose optimal penalty parameter
     cVal = [0.1,0.3,1.0,3.0,10.0,30.0,100.0]
@@ -126,27 +79,26 @@ def TrainSVM(X_train, X_val, X_test, y_train, y_val, y_test, U_r):
     ax.set_xlabel(r"Training Set Size",fontsize=20)
     ax.axis([40.0, 10000, -0.1, 0.5])
     plt.legend(loc='upper right',prop=prop)
-    plt.savefig('LC.pdf', bbox_inches='tight')
+    plt.savefig('LC_SVM.pdf', bbox_inches='tight')
     fig.clear()
 
     return optim
 
-def samIm(vals):
+def MakePred(X_train, y_train, optim, test, X_test, y_test):
 
-    fig = plt.figure(1, figsize=(10,10))
-    ax = fig.add_subplot(1, 1, 1)
-    ax.imshow(np.reshape(vals,(28,28)), cmap = cm.Greys_r)
-    plt.savefig('sample.pdf', bbox_inches='tight')
-    fig.clear()
+    '''
+    This function makes a prediction for the test set
 
-def MakePred(X_train, y_train, optim, test, U_r, X_test, y_test):
+    Parameters:
+    -----------
+    X_train: numpy array (training set)
+    y_train: numpy array (class labels of training set)
+    optim: optimal parameter for classification algorithm
+    test: numpy array (test set)
+    X_test: numpy array (set used to gauge performance - subset of initial training set)
+    y_test: numpy array (class labels for X_test)
 
-    test = meanNorm(test) # mean normalization
-    test = np.dot(test,U_r) # project into smaller subspace
-    
-    # using part of training set to see possible behavior
-    X_test = meanNorm(X_test)
-    X_test = np.dot(X_test,U_r)
+    '''
 
     # train model using optimal regularization
     print '     Training with 15000 samples...'
@@ -165,11 +117,11 @@ def main():
     # first read in data. tar == class label. dat == data
     print
     print "Reading Data..."
-    dat, tar = ReadDat("train.csv",1)
+    dat, tar = utils.ReadDat("train.csv",1)
     print "Done Reading.\n"
 
     print 'Generated Sample Image\n'
-    samIm(dat[11,:])
+    utils.sampleImage(dat[11,:])
 
     # preliminary statistics
     print "How many of each digit in training set?"
@@ -181,29 +133,40 @@ def main():
 
     # now perform preprocessing (mean normalization and SVD to reduce feature space)
     print 'Preprocessing...'
-    X_train, U_r = PreProcess(X_train)
+    X_train = utils.meanNorm(X_train)
+    X_val = utils.meanNorm(X_val)
+    X_test = utils.meanNorm(X_test)
+    U_r = utils.SVD(X_train,0.9)
+
+    print np.shape(X_train), np.shape(X_val), np.shape(X_test)
+    X_train = utils.Project(X_train,U_r)
+    X_val = utils.Project(X_val,U_r)
+    X_test = utils.Project(X_test,U_r)
+    print np.shape(X_train), np.shape(X_val), np.shape(X_test)
+
     print 'Done Preprocessing.\n'
 
     # now train SVM on training set; choose optimal SVM parameters based on validation set
     print 'Now training SVM...\n'
-    #print np.shape(X_train)
-    opt = TrainSVM(X_train, X_val, X_test, y_train, y_val, y_test, U_r)
+    opt = TrainSVM(X_train, X_val, X_test, y_train, y_val, y_test)
     print 
 
     # now read in test set
     print "Reading Test Set..."
-    test, tmp = ReadDat("test.csv",0)
+    test, tmp = utils.ReadDat("test.csv",0)
     print "Done Reading.\n"
+
+    # Preprocess test set
+    test = utils.meanNorm(test)
+    test = utils.Project(test,U_r)
 
     # now make prediction
     print 'Making Prediction'
-    pred = MakePred(X_train, y_train, opt, test, U_r, X_test, y_test)
+    pred = MakePred(X_train, y_train, opt, test, X_test, y_test)
 
     print
     print 'Outputting prediction\n'
-    open_file_object = csv.writer(open("predSVM.csv", "wb"))
-    for p in pred:
-        open_file_object.writerow(str(int(p)))
+    utils.OutputPred(pred,['ImageId','Label'],0)
 
     print 'Done'
 
