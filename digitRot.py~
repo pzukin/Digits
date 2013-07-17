@@ -1,7 +1,7 @@
 '''
 This script explores how well we can distinguish digits
 based on the ratio of a digits moment of inertia
-tensor.
+eigenvalues.
 
 '''
 
