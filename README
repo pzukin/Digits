@@ -4,6 +4,6 @@ The training and test data sets are also in the repository in case you wanted to
 
 digitSVM.py utilizes support vector machine
 
-digitRot.py experiments with how good of a distinguisher the eigenvalues of a digits moment of inertia tensor can be. The motivation is that the eigenvalues are independent of orientation of the digit.
+digitRot.py experiments with using calculated features that are independent of the digit's primary axis relative to the axes of the image. This naturally takes into account the issue with some people writing digits that are slanted. Then uses SVM on this new feature set.
 
 utils.py contains functions that are used in the above programs
